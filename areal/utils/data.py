@@ -260,7 +260,7 @@ def pack_tensor_dict(data: TensorDict):
     # Calculate cumulative sequence lengths
     lens = attention_mask.sum(dim=1, dtype=torch.int32)
     max_seqlen = lens.max().item()
-    cu_seqlens = torch.cumsum(lens, dim=0)
+    cu_seqlens = torch.cumsum(lens, dim=0, dtype=torch.int32)
     cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
 
     total_length = int(cu_seqlens[-1].item())
