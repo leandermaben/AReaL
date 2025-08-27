@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 import torch.distributed as dist
 import uvloop
+from megatron.core import parallel_state as mpu
 from tensordict import TensorDict
 from torchdata.stateful_dataloader import StatefulDataLoader
 
@@ -86,7 +87,10 @@ class WorkflowExecutor:
 
     def get_capacity(self):
         if dist.is_initialized():
-            world_size = dist.get_world_size()
+            if not mpu.is_initialized():
+                world_size = dist.get_world_size()
+            else:
+                world_size = mpu.get_data_parallel_world_size()
         else:
             world_size = 1
 
