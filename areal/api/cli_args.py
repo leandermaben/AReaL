@@ -258,6 +258,12 @@ class PPOActorConfig(TrainEngineConfig):
     eps_clip: float = field(
         default=0.2, metadata={"help": "Clipping factor for policy ratio"}
     )
+    eps_clip_higher: Optional[float] = field(
+        default=None,
+        metadata={
+            "help": "Clipping factor (higher value) for policy ratio. Defaults is None. When eps_clip_higher is setted (decouppled), eps_clip will be used as the lower value."
+        },
+    )
     c_clip: Optional[float] = field(
         default=None,
         metadata={
