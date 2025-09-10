@@ -38,11 +38,7 @@ class RemoteSGLangEngine(InferenceEngine):
         self.rid_to_address = {}
         # Maintain the addresses for the recent 128 requests
         self.rid_queue = []
-
-        self.addresses = os.getenv("AREAL_LLM_SERVER_ADDRS").split(",")
-
-        if not self.addresses:
-            raise RuntimeError("No configured SGLang servers.")
+        self.addresses = []
 
         self.server_idx = random.randint(0, len(self.addresses) - 1)
         self.distributed_weight_update_initialized = False
@@ -73,7 +69,7 @@ class RemoteSGLangEngine(InferenceEngine):
     def initialize(
         self,
         engine_id: Optional[str] = None,
-        addr: str | None = None,
+        addr: str | List[str] | None = None,
         ft_spec: FinetuneSpec | None = None,
         train_data_parallel_size: int | None = None,
     ):
@@ -84,6 +80,17 @@ class RemoteSGLangEngine(InferenceEngine):
                 engine_id = uuid.uuid4().hex
         self.engine_id = engine_id
         self.logger = logging.getLogger(f"[SGLang Remote Engine Rank {engine_id}]")
+
+        if addr:
+            self.addresses = addr if isinstance(addr, list) else [addr]
+        else:
+            # When addr is not provided, fallback to reading addrs from env var
+            self.addresses = os.getenv("AREAL_LLM_SERVER_ADDRS").split(",")
+        if not self.addresses:
+            raise RuntimeError(
+                "No configured SGLang servers. Please pass in SGLang server addresses by arguments "
+                "for `RemoteSGLangEngine.initialize` or environment variable `AREAL_LLM_SERVER_ADDRS`."
+            )
 
         self.logger.info("Waiting for server ready...")
         for addr_ in self.addresses:
