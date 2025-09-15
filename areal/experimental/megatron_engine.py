@@ -29,6 +29,7 @@ from areal.experimental.api.cli_args import (
 from areal.experimental.model.hf_load import load_weights_from_hf_with_mbridge_fast
 from areal.experimental.model.hf_save import save_weights_to_hf_with_mbridge_fast
 from areal.experimental.model.registry import make_hf_and_mcore_config, make_mcore_model
+from areal.experimental.utils.mcore.determinisitc import set_deterministic_algorithms
 from areal.experimental.utils.mcore.packed_context_parallel import (
     packed_context_parallel_forward,
 )
@@ -129,6 +130,10 @@ class MegatronEngine(TrainEngine):
             disable_dropout_in_model(self.model)
 
         model_config = get_model_config(self.model)
+        # NOTE: It is recommended to set this option to True for RL training on MoE models for stability.
+        if self.mcore_config.use_deterministic_algorithms:
+            set_deterministic_algorithms(model_config)
+
         if isinstance(self.model, DDP) and self.mcore_config.ddp.overlap_grad_reduce:
             model_config.no_sync_func = self.model.no_sync
         if (
