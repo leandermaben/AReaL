@@ -387,6 +387,23 @@ class PPOActorConfig(TrainEngineConfig):
 
 
 @dataclass
+class PPOCriticConfig(TrainEngineConfig):
+    """Configuration for PPO critic model, a subclass of a TrainEngine."""
+
+    ppo_n_minibatches: int = field(
+        default=4, metadata={"help": "Number of minibatches for each PPO update"}
+    )
+    eps_clip: float = field(
+        default=0.5, metadata={"help": "Clipping factor for value loss"}
+    )
+    mask_no_eos_with_zero: bool = field(
+        default=False,
+        metadata={
+            "help": "Mask truncated generations (no EOS token) and exclude from training"
+        },
+    )
+
+
 class vLLMConfig:
     """Configuration for vLLM runtime."""
 
@@ -1044,6 +1061,13 @@ class GRPOConfig(BaseExperimentConfig):
     rollout: InferenceEngineConfig = field(default_factory=InferenceEngineConfig)
     actor: PPOActorConfig = field(default_factory=PPOActorConfig)
     ref: PPOActorConfig = field(default_factory=PPOActorConfig)
+
+
+@dataclass
+class PPOConfig(GRPOConfig):
+    """Configuration for Proximal Policy Optimization (PPO) reinforcement learning experiments."""
+
+    critic: PPOCriticConfig = field(default_factory=PPOCriticConfig)
 
 
 def parse_cli_args(argv: List[str]):
