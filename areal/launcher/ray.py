@@ -379,7 +379,7 @@ def ray_main(config, run_id: int = 0):
         base_seed = config.sglang.random_seed
         sglang_args_list = [
             [
-                sys.argv[2:]
+                sys.argv[1:]
                 + [f"sglang.random_seed={base_seed + i * n_servers_per_node}"]
             ]
             for i in range(n_sglang_nodes)
@@ -459,7 +459,7 @@ def ray_main(config, run_id: int = 0):
 
         base_seed = config.vllm.seed
         vllm_args_list = [
-            [sys.argv[2:] + [f"vllm.seed={base_seed + i}"]]
+            [sys.argv[1:] + [f"vllm.seed={base_seed + i}"]]
             for i in range(n_vllm_servers)
         ]
         vllm_entry_point = str(
