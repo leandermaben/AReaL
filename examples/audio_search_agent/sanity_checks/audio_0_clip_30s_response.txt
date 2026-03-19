@@ -1,0 +1,7 @@
+Model: Qwen/Qwen3-Omni-30B-A3B-Instruct
+Prompt: What are the speakers discussing in this audio clip? Provide a brief summary.
+Input: audio_0_clip_30s.wav (30s clip from audio_0.wav, sr=16000, mono)
+Server: VLLM_USE_V1=0 vllm serve --port 8901 --dtype bfloat16 --max-model-len 24000 -tp 2
+
+--- Response ---
+The audio is a recording of a formal meeting of the Denver City Council. The first speaker, the president of the council, welcomes attendees by announcing the date and time of the regularly scheduled meeting. He then leads the council in reciting the Pledge of Allegiance.

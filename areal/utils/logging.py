@@ -67,6 +67,8 @@ LOGGER_COLORS_EXACT = {
     # Dataset - green
     "Dataset": "light_green",
     "CLEVR70KDataset": "light_green",
+    "AudioQADataset": "light_green",
+    "AudioSearchAgent": "light_purple",
     # Trainers - green
     "RLTrainer": "light_green",
     "SFTTrainer": "light_green",
@@ -77,6 +79,12 @@ LOGGER_COLORS_EXACT = {
     "Geometry3KReward": "purple",
     "RewardUtils": "purple",
     "RewardAPI": "purple",
+    # Audio search agent
+    "CLAPIndexer": "light_cyan",
+    "CLAPSearchTool": "light_cyan",
+    "OmniProbeTool": "light_cyan",
+    "SubmitTool": "light_purple",
+    "AgentLoop": "white",
     # Tree attention - cyan
     "TreeAttentionWrapper": "light_cyan",
     "TreeAttentionFSDP": "light_cyan",

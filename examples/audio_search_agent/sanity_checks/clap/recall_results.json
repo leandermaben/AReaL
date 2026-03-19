@@ -1,0 +1,182 @@
+{
+  "top_k_levels": [
+    5,
+    10,
+    30,
+    50
+  ],
+  "num_questions": 15,
+  "aggregate_recall": {
+    "5": 0.06888888888888887,
+    "10": 0.19111111111111112,
+    "30": 0.3188888888888889,
+    "50": 0.3188888888888889
+  },
+  "per_question": [
+    {
+      "question_id": "meetingbank_val_0:q0",
+      "question_text": "Which of the following statements is supported by the entire transcript?",
+      "num_gold_spans": 6,
+      "recall": {
+        "5": 0.0,
+        "10": 0.16666666666666666,
+        "30": 0.16666666666666666,
+        "50": 0.16666666666666666
+      }
+    },
+    {
+      "question_id": "meetingbank_val_0:q1",
+      "question_text": "What can be inferred about Speaker 5's emotional state based on their statement at 21m42s?",
+      "num_gold_spans": 1,
+      "recall": {
+        "5": 0.0,
+        "10": 0.0,
+        "30": 0.0,
+        "50": 0.0
+      }
+    },
+    {
+      "question_id": "meetingbank_val_0:q2",
+      "question_text": "What significant event did District Nine achieve for the first time, according to the speaker?",
+      "num_gold_spans": 1,
+      "recall": {
+        "5": 0.0,
+        "10": 0.0,
+        "30": 0.0,
+        "50": 0.0
+      }
+    },
+    {
+      "question_id": "meetingbank_val_0:q3",
+      "question_text": "Which of the following individuals is directly mentioned as being present at the council meeting and",
+      "num_gold_spans": 3,
+      "recall": {
+        "5": 0.0,
+        "10": 0.3333333333333333,
+        "30": 0.6666666666666666,
+        "50": 0.6666666666666666
+      }
+    },
+    {
+      "question_id": "meetingbank_val_0:q4",
+      "question_text": "Based on the city council meeting transcript, which of the following best describes the connection b",
+      "num_gold_spans": 5,
+      "recall": {
+        "5": 0.0,
+        "10": 0.0,
+        "30": 0.4,
+        "50": 0.4
+      }
+    },
+    {
+      "question_id": "meetingbank_val_1:q0",
+      "question_text": "Which of the following best describes the schedule for viewing replays of the Denver City Council me",
+      "num_gold_spans": 6,
+      "recall": {
+        "5": 0.0,
+        "10": 0.0,
+        "30": 0.16666666666666666,
+        "50": 0.16666666666666666
+      }
+    },
+    {
+      "question_id": "meetingbank_val_1:q1",
+      "question_text": "Which of the following best describes the timing and reason for the absence of a Denver City Council",
+      "num_gold_spans": 5,
+      "recall": {
+        "5": 0.2,
+        "10": 0.2,
+        "30": 0.4,
+        "50": 0.4
+      }
+    },
+    {
+      "question_id": "meetingbank_val_1:q2",
+      "question_text": "On which day and time is the next Denver City Council meeting scheduled after the July 4th holiday, ",
+      "num_gold_spans": 6,
+      "recall": {
+        "5": 0.0,
+        "10": 0.3333333333333333,
+        "30": 0.5,
+        "50": 0.5
+      }
+    },
+    {
+      "question_id": "meetingbank_val_1:q3",
+      "question_text": "Which of the following correctly describes the sequence of events during the June 27th Denver City C",
+      "num_gold_spans": 1,
+      "recall": {
+        "5": 0.0,
+        "10": 1.0,
+        "30": 1.0,
+        "50": 1.0
+      }
+    },
+    {
+      "question_id": "meetingbank_val_1:q4",
+      "question_text": "On which day and time is the Infrastructure and Culture Committee meeting scheduled to be replayed a",
+      "num_gold_spans": 3,
+      "recall": {
+        "5": 0.3333333333333333,
+        "10": 0.3333333333333333,
+        "30": 0.3333333333333333,
+        "50": 0.3333333333333333
+      }
+    },
+    {
+      "question_id": "meetingbank_val_10:q0",
+      "question_text": "Which of the following statements is supported by all four transcript spans?",
+      "num_gold_spans": 4,
+      "recall": {
+        "5": 0.25,
+        "10": 0.25,
+        "30": 0.25,
+        "50": 0.25
+      }
+    },
+    {
+      "question_id": "meetingbank_val_10:q1",
+      "question_text": "What is the primary purpose of Council Bill 119759, as described in the meeting?",
+      "num_gold_spans": 2,
+      "recall": {
+        "5": 0.0,
+        "10": 0.0,
+        "30": 0.0,
+        "50": 0.0
+      }
+    },
+    {
+      "question_id": "meetingbank_val_10:q2",
+      "question_text": "Why was public comment suspended at Seattle City Council meetings through March 31, 2020, and what a",
+      "num_gold_spans": 4,
+      "recall": {
+        "5": 0.0,
+        "10": 0.0,
+        "30": 0.25,
+        "50": 0.25
+      }
+    },
+    {
+      "question_id": "meetingbank_val_10:q3",
+      "question_text": "What was the reason the City Council suspended its rules during the remote meeting, and how did this",
+      "num_gold_spans": 5,
+      "recall": {
+        "5": 0.0,
+        "10": 0.0,
+        "30": 0.4,
+        "50": 0.4
+      }
+    },
+    {
+      "question_id": "meetingbank_val_10:q4",
+      "question_text": "Which council member is mentioned in both the initial roll call (Span 1) and the later roll call (Sp",
+      "num_gold_spans": 4,
+      "recall": {
+        "5": 0.25,
+        "10": 0.25,
+        "30": 0.25,
+        "50": 0.25
+      }
+    }
+  ]
+}

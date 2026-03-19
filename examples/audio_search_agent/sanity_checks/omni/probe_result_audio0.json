@@ -1,0 +1,25 @@
+{
+  "status": "ok",
+  "audio_id": "meetingbank_val_0",
+  "start_time": 0.0,
+  "end_time": 60.0,
+  "question": "What is being discussed in this audio segment? Provide a detailed summary.",
+  "answer": "The audio captures the beginning of a regularly scheduled Denver City Council meeting. The proceedings include the Pledge of Allegiance, followed by the roll call to determine the quorum.",
+  "events": [
+    "roll call",
+    "Pledge of Allegiance"
+  ],
+  "speakers": [
+    {
+      "id": "Speaker 1",
+      "characteristics": "A male speaker with a clear, formal tone, likely an official or clerk."
+    },
+    {
+      "id": "Speaker 2",
+      "characteristics": "A female speaker with a clear, formal tone, likely an official or clerk."
+    }
+  ],
+  "num_speakers": 2,
+  "transcript": "All the speakers, we are now going to transition into our regularly scheduled city council meeting. I want to welcome everyone to the Denver City Council meeting of Monday, May 21st, 2018. Please rise and join Councilman Cashman with the Pledge of Allegiance. All right, Madam Secretary, roll call. Black. Clark. Espinosa. Flynn. Gilmore. Herndon. Cashman. Konich. Lopez. New. Ortega. Sesman.",
+  "additional_info": "The audio clip is a high-fidelity recording of a formal city council meeting. The proceedings are conducted in a structured, official manner. The audio contains a clear roll call, followed by the Pledge of Allegiance, which is recited by the entire room. The audio quality is excellent, with minimal background noise, and clear, distinct voices for each speaker."
+}

@@ -1,0 +1,196 @@
+# Audio Search Agent – GRPO training config
+# Hardware: 1 node, 2× A6000 48 GB
+#   GPU 0 → vLLM inference engine (rollout)
+#   GPU 1 → FSDP actor + ref model (training)
+#
+# Launch:
+#   POSTGRES_PORT=5433 python -m examples.audio_search_agent.train \
+#       --config examples/audio_search_agent/config_2gpu.yaml
+
+experiment_name: audio-search-agent-grpo
+trial_name: v0
+
+seed: 42
+enable_offload: false
+total_train_epochs: 5
+total_train_steps: null
+tokenizer_path: ${actor.path}
+
+# Agent-specific config
+max_search_turns: 3
+postgres_host: localhost
+postgres_port: 5433
+postgres_db: espnet_db
+postgres_user: espnet_user
+postgres_password: espnet_password
+data_dirs: []   # empty = use default QA dirs under LONGFORM_ROOT
+train_ratio: 0.9
+filter_to_ingested: true
+
+cluster:
+  n_nodes: 1
+  n_gpus_per_node: 2
+  fileroot: /data/user_data/lmaben/areal/audio_search
+  name_resolve:
+    type: nfs
+    nfs_record_root: /tmp/areal/name_resolve
+
+# 1 GPU for vLLM + 1 GPU for actor (d=data, p=pipeline, t=tensor parallel)
+allocation_mode: vllm:d1p1t1+d1p1t1
+
+scheduler:
+  type: local
+
+rollout:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  tokenizer_path: ${tokenizer_path}
+  max_concurrent_rollouts: 32
+  queue_size: null
+  consumer_batch_size: ${train_dataset.batch_size}
+  max_head_offpolicyness: 2
+  enable_rollout_tracing: false
+  scheduling_spec: ${actor.scheduling_spec}
+  dump_to_file: true
+  # Proxy config: agent runs inline, reward discounted across search turns
+  openai:
+    mode: inline
+    tool_call_parser: qwen25
+    reasoning_parser: qwen3
+    export_style: individual   # each LLM call is an independent training sample
+    turn_discount: 0.9         # earlier search steps get discounted reward
+
+gconfig:
+  n_samples: 2          # rollouts per prompt (reduced for memory)
+  min_new_tokens: 0
+  max_new_tokens: 256
+  max_tokens: 512
+  greedy: false
+  temperature: 1.0
+
+actor:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: Qwen/Qwen3-4B-Instruct-2507
+  init_from_scratch: false
+  disable_dropout: true
+  gradient_checkpointing: true
+  dtype: bfloat16
+  mb_spec:
+    max_tokens_per_mb: 8192
+  optimizer:
+    type: adam
+    lr: 5.0e-6
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1e-8
+    lr_scheduler_type: constant
+    gradient_clipping: 1.0
+    warmup_steps_proportion: 0.01
+  eps_clip: 0.4
+  temperature: ${gconfig.temperature}
+  reward_scaling: 1.0   # rewards are already in [0, 1]
+  reward_bias: 0.0
+  kl_ctl: 0.0
+  ppo_n_minibatches: 1
+  recompute_logprob: true
+  use_decoupled_loss: true
+  behav_imp_weight_cap: 5.0
+  reward_norm: null     # small dataset; skip group normalisation for V0
+  adv_norm:
+    mean_level: batch
+    std_level: batch
+  max_new_tokens: ${gconfig.max_new_tokens}
+  scheduling_spec:
+    - task_type: worker
+      port_count: 2
+      gpu: 1
+      mem: 32
+      cmd: python3 -m areal.infra.rpc.rpc_server
+      env_vars:
+        CUDA_LAUNCH_BLOCKING: "1"
+        PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
+
+ref:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: ${actor.path}
+  init_from_scratch: false
+  disable_dropout: true
+  dtype: ${actor.dtype}
+  mb_spec:
+    max_tokens_per_mb: 8192
+  optimizer: null
+  scheduling_strategy:
+    type: colocation
+    target: actor
+  scheduling_spec: ${actor.scheduling_spec}
+
+# vLLM inference engine
+vllm:
+  model: ${actor.path}
+  seed: ${seed}
+  skip_tokenizer_init: false
+  dtype: ${actor.dtype}
+  max_model_len: 8192
+  gpu_memory_utilization: 0.85
+
+# Dataset
+train_dataset:
+  batch_size: 16
+  shuffle: true
+  pin_memory: true
+  num_workers: 2
+  path: audio_qa       # unused path key (dataset loaded by train.py directly)
+  type: rl
+
+valid_dataset:
+  batch_size: 16
+  pin_memory: true
+  num_workers: 2
+  path: audio_qa
+  type: rl
+
+# Checkpointing
+saver:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: 50
+  freq_secs: 3600
+
+recover:
+  mode: disabled
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: null
+  freq_secs: 3600
+
+evaluator:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: null
+  freq_secs: null
+
+stats_logger:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  wandb:
+    mode: online
+    project: audio-search-agent
+
+perf_tracer:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  enabled: false
+  session_tracer:
+    enabled: false

@@ -64,6 +64,9 @@ dependencies = [
     "matplotlib",
     "seaborn",
 
+    # Audio search / CLAP retrieval
+    "faiss-cpu>=1.13.0",
+
     # Utilities and data processing
     "setproctitle",
     "nltk",

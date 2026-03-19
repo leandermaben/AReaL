@@ -1,0 +1,1 @@
+Let's try with a Audio enabled LLM like Qwen-Omni. Let's try 2.5 for now

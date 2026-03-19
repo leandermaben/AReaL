@@ -1,0 +1,202 @@
+# Audio Search Agent – GRPO training config
+# Hardware: 1 node, 8× A6000 48 GB
+#   GPUs 0-1  → vLLM inference (d2 = 2 independent instances, 1 GPU each)
+#   GPUs 2-7  → FSDP actor + ref model (d6 = 6 data-parallel workers)
+#
+# Data: all 10-min and 30-min LongformAudio QA dirs, filtered to ingested
+#
+# Launch:
+#   POSTGRES_PORT=5433 python -m examples.audio_search_agent.train \
+#       --config examples/audio_search_agent/config_8gpu.yaml
+
+experiment_name: audio-search-agent-grpo
+trial_name: v0-8gpu
+
+seed: 42
+enable_offload: false
+total_train_epochs: 5
+total_train_steps: null
+tokenizer_path: ${actor.path}
+
+# Agent-specific config
+max_search_turns: 4
+postgres_host: localhost
+postgres_port: 5433
+postgres_db: espnet_db
+postgres_user: espnet_user
+postgres_password: espnet_password
+data_dirs: []   # empty = all DEFAULT_QA_DIRS (10min + 30min)
+train_ratio: 0.9
+filter_to_ingested: true
+
+cluster:
+  n_nodes: 1
+  n_gpus_per_node: 8
+  fileroot: /data/user_data/lmaben/areal/audio_search
+  name_resolve:
+    type: nfs
+    nfs_record_root: /tmp/areal/name_resolve
+
+# 2 GPUs for vLLM (d2 = 2 independent instances) + 6 GPUs for actor (d6 = data parallel)
+allocation_mode: vllm:d2p1t1+d6p1t1
+
+scheduler:
+  type: local
+
+rollout:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  tokenizer_path: ${tokenizer_path}
+  max_concurrent_rollouts: 128   # 2 vLLM instances × ~64 concurrent each
+  queue_size: null
+  consumer_batch_size: ${train_dataset.batch_size}
+  max_head_offpolicyness: 2
+  enable_rollout_tracing: false
+  scheduling_spec: ${actor.scheduling_spec}
+  dump_to_file: true
+  openai:
+    mode: inline
+    tool_call_parser: qwen25
+    reasoning_parser: qwen3
+    export_style: individual   # each LLM call step is an independent training sample
+    turn_discount: 0.9         # earlier search steps get discounted reward
+
+gconfig:
+  n_samples: 4          # 4 rollouts per prompt (more diversity with 6 actor GPUs)
+  min_new_tokens: 0
+  max_new_tokens: 1024
+  max_tokens: 2048
+  greedy: false
+  temperature: 1.0
+
+actor:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: Qwen/Qwen3-4B-Instruct-2507
+  init_from_scratch: false
+  disable_dropout: true
+  gradient_checkpointing: true
+  dtype: bfloat16
+  mb_spec:
+    max_tokens_per_mb: 8192   # lm_head activation: 8192×150k vocab×2B ≈ 2.5 GB
+  optimizer:
+    type: adam
+    lr: 5.0e-6
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1e-8
+    lr_scheduler_type: constant
+    gradient_clipping: 1.0
+    warmup_steps_proportion: 0.01
+  eps_clip: 0.4
+  temperature: ${gconfig.temperature}
+  reward_scaling: 1.0
+  reward_bias: 0.0
+  kl_ctl: 0.0
+  ppo_n_minibatches: 1
+  recompute_logprob: true
+  use_decoupled_loss: true
+  behav_imp_weight_cap: 5.0
+  reward_norm: null
+  adv_norm:
+    mean_level: batch
+    std_level: batch
+  max_new_tokens: ${gconfig.max_new_tokens}
+  scheduling_spec:
+    - task_type: worker
+      port_count: 2
+      gpu: 1
+      mem: 32
+      cmd: /home/lmaben/research/speech/long_speech/AReaL/.venv/bin/python -m areal.infra.rpc.rpc_server
+      env_vars:
+        PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
+        NCCL_P2P_DISABLE: "1"
+        NCCL_DEBUG: "WARN"
+
+ref:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: ${actor.path}
+  init_from_scratch: false
+  disable_dropout: true
+  dtype: ${actor.dtype}
+  mb_spec:
+    max_tokens_per_mb: 8192
+  optimizer: null
+  scheduling_strategy:
+    type: colocation
+    target: actor
+  scheduling_spec: ${actor.scheduling_spec}
+
+# vLLM inference engine
+# 12 K context: gives room for 30-min audio multi-turn searches;
+# individual training samples stay well under max_tokens_per_mb (8192)
+# because export_style=individual only trains one turn at a time.
+vllm:
+  model: ${actor.path}
+  seed: ${seed}
+  skip_tokenizer_init: false
+  dtype: ${actor.dtype}
+  max_model_len: 12288
+  gpu_memory_utilization: 0.85
+
+# Dataset
+# batch_size=96 = 6 data-parallel workers × 16 sequences each (same per-worker load as 2-GPU)
+train_dataset:
+  batch_size: 96
+  shuffle: true
+  pin_memory: true
+  num_workers: 4
+  path: audio_qa
+  type: rl
+
+valid_dataset:
+  batch_size: 48
+  pin_memory: true
+  num_workers: 4
+  path: audio_qa
+  type: rl
+
+# Checkpointing
+saver:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: 50
+  freq_secs: 3600
+
+recover:
+  mode: disabled
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: null
+  freq_secs: 3600
+
+evaluator:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: null
+  freq_secs: null
+
+stats_logger:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  wandb:
+    mode: online
+    project: audio-search-agent
+
+perf_tracer:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  enabled: false
+  session_tracer:
+    enabled: false
