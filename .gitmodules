@@ -1,0 +1,4 @@
+[submodule "examples/audio_search_agent/v1/agent/tools/omni/installation_repos/vllm"]
+	path = examples/audio_search_agent/v1/agent/tools/omni/installation_repos/vllm
+	url = https://github.com/wangxiongts/vllm.git
+	branch = qwen3_omni

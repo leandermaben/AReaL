@@ -24,8 +24,8 @@ step_limit: 12
 meetingbank_data_root: /work/hdd/bbjs/lmaben/speech/long_speech/meeting_bank_prepared
 meetingbank_split: val
 max_nonfactual_ratio: 0.1
-val_max_factual: 20
-val_max_nonfactual: 5
+val_max_factual: 40
+val_max_nonfactual: 10
 
 # CLAP config
 clap_cache_dir: /work/hdd/bbjs/lmaben/speech/long_speech/clap_index/meetingbank
@@ -106,7 +106,7 @@ actor:
   ppo_n_minibatches: 1
   recompute_logprob: true
   use_decoupled_loss: true
-  behav_imp_weight_cap: 5.0
+  behave_imp_weight_cap: 5.0
   reward_norm: null
   adv_norm:
     mean_level: batch

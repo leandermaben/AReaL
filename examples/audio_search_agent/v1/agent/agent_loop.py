@@ -42,7 +42,8 @@ You are an audio search agent. Your task is to find the relevant audio snippets 
 that answer a question about a long audio recording.
 
 You have access to tools for searching and analyzing the audio. A typical workflow is:
-1. Use clap_search to find segments that semantically match aspects of the question.
+1. Use clap_search to find segments that semantically match aspects of the question. \
+   You can set top_k up to 50 to cast a wider net.
 2. Use omni_probe to deeply analyze the most promising segments — get transcripts, \
    speaker info, and verify relevance. Note: omni_probe accepts segments up to 150 \
    seconds (2.5 minutes) per call.

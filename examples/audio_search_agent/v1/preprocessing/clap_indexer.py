@@ -134,15 +134,35 @@ class CLAPIndexer:
     # ── model loading ──────────────────────────────────────────
 
     def _load_model(self):
-        """Lazily load CLAP model + processor onto the configured device."""
+        """Lazily load CLAP model + processor onto the configured device.
+
+        Bypasses ``from_pretrained`` for model weights to avoid FSDP / meta-device
+        init contexts. Loads the config, creates an empty model on the target
+        device, then loads the state dict with ``assign=True``.
+        """
         if self._model is not None:
             return
-        from transformers import ClapModel, ClapProcessor
+        from transformers import ClapConfig, ClapModel, ClapProcessor
 
         logger.info(f"Loading CLAP model: {self.config.model_id}")
         self._processor = ClapProcessor.from_pretrained(self.config.model_id)
-        self._model = ClapModel.from_pretrained(self.config.model_id)
-        self._model = self._model.to(self.config.device)
+
+        # Load config and resolve the cached checkpoint path
+        clap_config = ClapConfig.from_pretrained(self.config.model_id)
+        from huggingface_hub import hf_hub_download
+
+        ckpt_path = hf_hub_download(
+            self.config.model_id, filename="pytorch_model.bin"
+        )
+        state_dict = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+
+        # Build model on meta (fast, no memory), move to real device, load weights
+        with torch.device("meta"):
+            model = ClapModel(clap_config)
+        model = model.to_empty(device=self.config.device)
+        model.load_state_dict(state_dict, assign=True)
+
+        self._model = model
         self._model.eval()
         logger.info(f"CLAP model ready on {self.config.device}")
 

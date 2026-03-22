@@ -52,7 +52,7 @@ class CLAPSearchTool(Tool):
             },
             "top_k": {
                 "type": "integer",
-                "description": "Number of segments to return (default: 10).",
+                "description": "Number of segments to return (default: 10, max: 50).",
                 "default": 10,
             },
         },
@@ -100,7 +100,7 @@ class CLAPSearchTool(Tool):
                 error:    error message (only if status == "error")
         """
         query = kwargs["query"]
-        top_k = kwargs.get("top_k", 10)
+        top_k = min(kwargs.get("top_k", 10), 50)
 
         logger.info(f"CLAP search: audio_id={self._audio_id}, query='{query}', top_k={top_k}")
 
