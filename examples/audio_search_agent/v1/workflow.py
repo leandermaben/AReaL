@@ -42,7 +42,7 @@ class AudioSearchWorkflow:
         omni_model: str = "Qwen/Qwen3-Omni-30B-A3B-Instruct",
         omni_slice_tmpdir: str | None = None,
         aux_weight: float = 0.15,
-        answer_weight: float = 0.2,
+        answer_weight: float = 0.25,
     ):
         self.max_search_turns = max_search_turns
         self.step_limit = step_limit
@@ -80,8 +80,13 @@ class AudioSearchWorkflow:
         ]
 
         if self.omni_url:
+            # Support comma-separated URLs for load balancing
+            if isinstance(self.omni_url, str):
+                urls = [u.strip() for u in self.omni_url.split(",") if u.strip()]
+            else:
+                urls = self.omni_url
             tools.append(OmniProbeTool(
-                omni_url=self.omni_url,
+                omni_url=urls if len(urls) > 1 else urls[0],
                 model=self.omni_model,
                 wav_path=wav_path,
                 audio_id=audio_id,

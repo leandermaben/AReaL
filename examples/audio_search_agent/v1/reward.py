@@ -84,7 +84,7 @@ def compute_reward(
     n_turns: int,
     step_limit: int = 12,
     aux_weight: float = 0.15,
-    answer_weight: float = 0.2,
+    answer_weight: float = 0.25,
 ) -> dict[str, float]:
     """Compute the total reward and its components.
 

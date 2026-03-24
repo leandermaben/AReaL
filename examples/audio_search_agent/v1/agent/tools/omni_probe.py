@@ -72,6 +72,12 @@ def _slice_audio_to_file(
     end_sample = max(start_sample, min(int(end_time * sr), waveform.shape[1]))
     segment = waveform[:, start_sample:end_sample]
 
+    if segment.shape[1] == 0:
+        raise ValueError(
+            f"Empty audio segment: start_time={start_time}, end_time={end_time}, "
+            f"audio length={waveform.shape[1] / sr:.1f}s"
+        )
+
     fd, tmp_path = tempfile.mkstemp(suffix=".wav", dir=tmpdir)
     os.close(fd)
     torchaudio.save(tmp_path, segment, sr, format="wav")
@@ -124,7 +130,7 @@ class OmniProbeTool(Tool):
 
     def __init__(
         self,
-        omni_url: str,
+        omni_url: str | list[str],
         model: str,
         wav_path: str,
         audio_id: str,
@@ -136,7 +142,8 @@ class OmniProbeTool(Tool):
         """Create an Omni probe tool bound to one audio recording.
 
         Args:
-            omni_url:    Base URL of the vLLM server (e.g. "http://localhost:8000/v1").
+            omni_url:    Base URL(s) of the vLLM server(s). Can be a single URL
+                         string or a list of URLs for load balancing (random selection).
             model:       Model name (e.g. "Qwen/Qwen3-Omni-30B-A3B-Instruct").
             wav_path:    Path to the audio file for this episode.
             audio_id:    Audio ID for logging/tracking.
@@ -147,13 +154,22 @@ class OmniProbeTool(Tool):
                          storage if vLLM runs on a different node. Defaults to
                          $OMNI_SLICE_TMPDIR or system temp.
         """
-        self._client = AsyncOpenAI(base_url=omni_url, api_key=api_key)
+        import random
+        self._rng = random.Random()
+
+        if isinstance(omni_url, str):
+            omni_url = [omni_url]
+        self._clients = [AsyncOpenAI(base_url=u, api_key=api_key) for u in omni_url]
         self._model = model
         self._wav_path = wav_path
         self._audio_id = audio_id
         self._max_retries = max_retries
         self._temperature = temperature
         self._slice_tmpdir = slice_tmpdir
+
+    def _get_client(self) -> AsyncOpenAI:
+        """Return a randomly selected client for load balancing."""
+        return self._rng.choice(self._clients)
 
     @property
     def audio_id(self) -> str:
@@ -211,6 +227,11 @@ class OmniProbeTool(Tool):
             return self._error(start_time, end_time, question, "end_time must be > start_time")
 
         duration = end_time - start_time
+        if duration < 0.1:
+            return self._error(
+                start_time, end_time, question,
+                f"Segment too short ({duration:.2f}s). Minimum is 0.1s.",
+            )
         if duration > MAX_SLICE_DURATION:
             return self._error(
                 start_time, end_time, question,
@@ -256,7 +277,7 @@ class OmniProbeTool(Tool):
 
         for attempt in range(self._max_retries + 1):
             try:
-                resp = await self._client.chat.completions.create(
+                resp = await self._get_client().chat.completions.create(
                     model=self._model,
                     messages=messages,
                     max_tokens=1024,

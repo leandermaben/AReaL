@@ -73,6 +73,6 @@ class AudioSearchV1Config(GRPOConfig):
         metadata={"help": "Weight for auxiliary reward (submit at step_limit with spans)."},
     )
     answer_weight: float = field(
-        default=0.2,
+        default=0.25,
         metadata={"help": "Weight for answer exact-match reward."},
     )
