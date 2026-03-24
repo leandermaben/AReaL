@@ -22,10 +22,13 @@ from .config import AudioSearchV1Config
 def main(args):
     config, _ = load_expr_config(args, AudioSearchV1Config)
 
+    # Add timestamp to trial_name so each run gets unique log/checkpoint dirs
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    config.trial_name = f"{config.trial_name}_{ts}"
+
     # Set wandb run name with timestamp if not already set
     if not config.stats_logger.wandb.name:
-        ts = time.strftime("%Y%m%d_%H%M%S")
-        config.stats_logger.wandb.name = f"{config.trial_name}_{ts}"
+        config.stats_logger.wandb.name = config.trial_name
 
     from .dataset import get_meetingbank_dataset
 

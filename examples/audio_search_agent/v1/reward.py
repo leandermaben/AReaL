@@ -37,33 +37,35 @@ def _spans_to_windows(spans: list[dict], window_size: float = WINDOW_SIZE) -> se
 def window_f1(
     predicted_spans: list[dict],
     gold_spans: list[dict],
-) -> float:
-    """Compute F1 over 3-second aligned windows.
+) -> dict[str, float]:
+    """Compute F1, precision, and recall over 3-second aligned windows.
 
     Flattens both predicted and gold spans into sets of window indices,
     then computes precision, recall, and F1 over those sets.
 
     Returns:
-        F1 score in [0, 1].
+        dict with keys: f1, precision, recall
     """
     if not gold_spans:
-        return 1.0 if not predicted_spans else 0.0
+        f1 = 1.0 if not predicted_spans else 0.0
+        return {"f1": f1, "precision": f1, "recall": f1}
     if not predicted_spans:
-        return 0.0
+        return {"f1": 0.0, "precision": 0.0, "recall": 0.0}
 
     pred_windows = _spans_to_windows(predicted_spans)
     gold_windows = _spans_to_windows(gold_spans)
 
     if not pred_windows or not gold_windows:
-        return 0.0
+        return {"f1": 0.0, "precision": 0.0, "recall": 0.0}
 
     intersection = pred_windows & gold_windows
     precision = len(intersection) / len(pred_windows)
     recall = len(intersection) / len(gold_windows)
 
     if precision + recall == 0.0:
-        return 0.0
-    return 2.0 * precision * recall / (precision + recall)
+        return {"f1": 0.0, "precision": precision, "recall": recall}
+    f1 = 2.0 * precision * recall / (precision + recall)
+    return {"f1": f1, "precision": precision, "recall": recall}
 
 
 def answer_reward(predicted_answer: str, gold_answer: str) -> float:
@@ -92,15 +94,17 @@ def compute_reward(
         dict with keys: total, f1, aux, answer
     """
     if n_turns > step_limit:
-        return {"total": 0.0, "f1": 0.0, "aux": 0.0, "answer": 0.0}
+        return {"total": 0.0, "f1": 0.0, "precision": 0.0, "recall": 0.0, "aux": 0.0, "answer": 0.0}
 
-    f1 = window_f1(predicted_spans, gold_spans)
+    f1_result = window_f1(predicted_spans, gold_spans)
     aux = aux_weight if (n_turns == step_limit and predicted_spans) else 0.0
     ans = answer_weight * answer_reward(predicted_answer, gold_answer)
 
     return {
-        "total": f1 + aux + ans,
-        "f1": f1,
+        "total": f1_result["f1"] + aux + ans,
+        "f1": f1_result["f1"],
+        "precision": f1_result["precision"],
+        "recall": f1_result["recall"],
         "aux": aux,
         "answer": ans,
     }

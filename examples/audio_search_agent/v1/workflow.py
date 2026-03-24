@@ -164,6 +164,12 @@ class AudioSearchWorkflow:
             answer_weight=self.answer_weight,
         )
 
+        # Predicted duration: sum of all predicted span durations
+        predicted_duration = sum(
+            max(0.0, s.get("end_time", 0.0) - s.get("start_time", 0.0))
+            for s in predicted_spans
+        )
+
         # Log custom metrics to wandb via stats_tracker
         try:
             from areal import workflow_context
@@ -171,6 +177,8 @@ class AudioSearchWorkflow:
             tracker.scalar(
                 reward=rewards["total"],
                 reward_f1=rewards["f1"],
+                reward_precision=rewards["precision"],
+                reward_recall=rewards["recall"],
                 reward_aux=rewards["aux"],
                 reward_answer=rewards["answer"],
                 num_turns=float(n_turns),
@@ -178,6 +186,7 @@ class AudioSearchWorkflow:
                 num_predicted_spans=float(len(predicted_spans)),
                 num_gold_spans=float(len(gold_spans)),
                 num_tool_calls=float(num_tool_calls),
+                predicted_duration=predicted_duration,
             )
         except Exception:
             # stats_tracker may not be available outside AReaL training
@@ -186,7 +195,7 @@ class AudioSearchWorkflow:
         logger.info(
             f"[{audio_id}] status={status} turns={n_turns}/{self.step_limit} "
             f"submitted={len(predicted_spans)} gold={len(gold_spans)} "
-            f"f1={rewards['f1']:.3f} aux={rewards['aux']:.3f} "
-            f"answer={rewards['answer']:.3f} total={rewards['total']:.3f}"
+            f"f1={rewards['f1']:.3f} p={rewards['precision']:.3f} r={rewards['recall']:.3f} "
+            f"aux={rewards['aux']:.3f} answer={rewards['answer']:.3f} total={rewards['total']:.3f}"
         )
         return rewards["total"]
