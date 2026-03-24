@@ -195,6 +195,7 @@ stats_logger:
   wandb:
     mode: online
     project: audio-search-agent-v1
+    id_suffix: timestamp
 
 perf_tracer:
   experiment_name: ${experiment_name}

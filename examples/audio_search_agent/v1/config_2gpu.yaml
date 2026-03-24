@@ -167,25 +167,25 @@ saver:
   experiment_name: ${experiment_name}
   trial_name: ${trial_name}
   fileroot: ${cluster.fileroot}
-  freq_epochs: 1
+  freq_epochs: null
   freq_steps: 50
-  freq_secs: 3600
+  freq_secs: null
 
 recover:
   mode: disabled
   experiment_name: ${experiment_name}
   trial_name: ${trial_name}
   fileroot: ${cluster.fileroot}
-  freq_epochs: 1
-  freq_steps: null
-  freq_secs: 3600
+  freq_epochs: null
+  freq_steps: 50
+  freq_secs: null
 
 evaluator:
   experiment_name: ${experiment_name}
   trial_name: ${trial_name}
   fileroot: ${cluster.fileroot}
-  freq_epochs: 1
-  freq_steps: null
+  freq_epochs: null
+  freq_steps: 50
   freq_secs: null
 
 stats_logger:
@@ -195,6 +195,7 @@ stats_logger:
   wandb:
     mode: online
     project: audio-search-agent-v1
+    id_suffix: timestamp
 
 perf_tracer:
   experiment_name: ${experiment_name}

@@ -46,7 +46,8 @@ You have access to tools for searching and analyzing the audio. A typical workfl
    You can set top_k up to 50 to cast a wider net.
 2. Use omni_probe to deeply analyze the most promising segments — get transcripts, \
    speaker info, and verify relevance. Note: omni_probe accepts segments up to 150 \
-   seconds (2.5 minutes) per call.
+   seconds (2.5 minutes) per call. You can often group multiple segments from clap_search 
+   into a single omni_probe call to cast a wider net. Yiu can also break the segments for a zoomed in view.
 3. Once you have identified all relevant snippets, use submit to deliver your final answer.
 
 IMPORTANT RULES:

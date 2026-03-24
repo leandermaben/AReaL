@@ -142,12 +142,11 @@ class AudioSearchWorkflow:
         status = result.get("status", "error")
         did_submit = 1.0 if status == "submitted" else 0.0
 
-        # Count total tool calls and estimate sequence length from messages
+        # Count total tool calls from messages
         messages = result.get("messages", [])
         num_tool_calls = sum(
             len(m.get("tool_calls", [])) for m in messages if m.get("role") == "assistant"
         )
-        seq_length = sum(len(str(m.get("content", ""))) for m in messages)
 
         # Compute raw F1 (un-gated, for logging) and gated reward
         raw_f1 = span_f1(predicted_spans, gold_spans, iou_threshold=self.iou_threshold)
@@ -171,7 +170,6 @@ class AudioSearchWorkflow:
                 num_predicted_spans=float(len(predicted_spans)),
                 num_gold_spans=float(len(gold_spans)),
                 num_tool_calls=float(num_tool_calls),
-                seq_length=float(seq_length),
             )
         except Exception:
             # stats_tracker may not be available outside AReaL training

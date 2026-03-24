@@ -91,12 +91,16 @@ def step_gated_f1_reward(
     n_turns: int,
     step_limit: int = 12,
     iou_threshold: float = 0.5,
+    aux_weight: float = 0.3,
 ) -> float:
     """Compute span F1 reward, gated on the agent using exactly step_limit turns.
 
     Returns:
-        span_f1 + 1.0 if n_turns == step_limit, else 0.0
+        span_f1 + aux_weight if n_turns == step_limit and submitted non-zero snippets,
+        else 0.0.
     """
-    if n_turns != step_limit:
+    if n_turns > step_limit:
         return 0.0
-    return span_f1(predicted_spans, gold_spans, iou_threshold=iou_threshold) + 1.0
+    f1 = span_f1(predicted_spans, gold_spans, iou_threshold=iou_threshold)
+    aux = aux_weight if (n_turns == step_limit and predicted_spans) else 0.0
+    return f1 + aux
