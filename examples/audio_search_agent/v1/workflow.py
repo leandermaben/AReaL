@@ -7,8 +7,8 @@ argument to PPOTrainer.train().
 The workflow:
   1. Instantiates tools (CLAP search, Omni probe, submit) for the episode's audio.
   2. Runs the agent loop with the AReaL proxy client.
-  3. Computes span-level F1 reward, gated on step count.
-  4. Logs custom metrics (turns, spans, F1) to wandb via stats_tracker.
+  3. Computes reward (window F1 + aux + answer).
+  4. Logs custom metrics (turns, spans, reward components) to wandb via stats_tracker.
   5. Returns the scalar reward.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from typing import Any
 from areal.utils import stats_tracker
 from areal.utils.logging import getLogger
 
-from .reward import span_f1, step_gated_f1_reward
+from .reward import compute_reward
 
 logger = getLogger("AudioSearchWorkflow")
 
@@ -41,7 +41,8 @@ class AudioSearchWorkflow:
         omni_url: str | None = None,
         omni_model: str = "Qwen/Qwen3-Omni-30B-A3B-Instruct",
         omni_slice_tmpdir: str | None = None,
-        iou_threshold: float = 0.5,
+        aux_weight: float = 0.15,
+        answer_weight: float = 0.2,
     ):
         self.max_search_turns = max_search_turns
         self.step_limit = step_limit
@@ -51,7 +52,8 @@ class AudioSearchWorkflow:
         self.omni_url = omni_url
         self.omni_model = omni_model
         self.omni_slice_tmpdir = omni_slice_tmpdir
-        self.iou_threshold = iou_threshold
+        self.aux_weight = aux_weight
+        self.answer_weight = answer_weight
 
         # Lazy-loaded CLAP indexer (shared across episodes)
         self._clap_indexer = None
@@ -97,13 +99,7 @@ class AudioSearchWorkflow:
         http_client=None,
         **kwargs,
     ) -> float:
-        """Run the full search-and-answer pipeline; return scalar reward.
-
-        Returns
-        -------
-        float
-            Reward: span F1 gated on using exactly step_limit turns.
-        """
+        """Run the full search-and-answer pipeline; return scalar reward."""
         from .agent.agent_loop import AudioSearchAgent
 
         resolved_base_url = base_url or os.environ.get("OPENAI_BASE_URL", "http://localhost:8000/v1")
@@ -112,6 +108,7 @@ class AudioSearchWorkflow:
         audio_id: str = data["audio_id"]
         question: str = data["messages"][-1]["content"]
         gold_spans: list[dict] = data.get("gold_spans", [])
+        gold_answer: str = data.get("answer", "")
         wav_path: str = data.get("wav_path", "")
         duration: float = data.get("duration", 0.0)
         duration_str = f"{int(duration // 60)} minutes" if duration > 0 else "unknown duration"
@@ -132,11 +129,13 @@ class AudioSearchWorkflow:
             duration_str=duration_str,
         )
 
-        # Extract submitted spans
+        # Extract submitted spans and predicted answer
         submission = result.get("submission")
         predicted_spans = []
+        predicted_answer = ""
         if submission and submission.get("status") == "ok":
             predicted_spans = submission.get("snippets", [])
+            predicted_answer = submission.get("answer", "")
 
         n_turns = result.get("turns", 0)
         status = result.get("status", "error")
@@ -148,14 +147,16 @@ class AudioSearchWorkflow:
             len(m.get("tool_calls", [])) for m in messages if m.get("role") == "assistant"
         )
 
-        # Compute raw F1 (un-gated, for logging) and gated reward
-        raw_f1 = span_f1(predicted_spans, gold_spans, iou_threshold=self.iou_threshold)
-        reward = step_gated_f1_reward(
+        # Compute reward components
+        rewards = compute_reward(
             predicted_spans=predicted_spans,
             gold_spans=gold_spans,
+            predicted_answer=predicted_answer,
+            gold_answer=gold_answer,
             n_turns=n_turns,
             step_limit=self.step_limit,
-            iou_threshold=self.iou_threshold,
+            aux_weight=self.aux_weight,
+            answer_weight=self.answer_weight,
         )
 
         # Log custom metrics to wandb via stats_tracker
@@ -163,8 +164,10 @@ class AudioSearchWorkflow:
             from areal import workflow_context
             tracker = stats_tracker.get(workflow_context.stat_scope())
             tracker.scalar(
-                reward=reward,
-                raw_span_f1=raw_f1,
+                reward=rewards["total"],
+                reward_f1=rewards["f1"],
+                reward_aux=rewards["aux"],
+                reward_answer=rewards["answer"],
                 num_turns=float(n_turns),
                 did_submit=did_submit,
                 num_predicted_spans=float(len(predicted_spans)),
@@ -178,6 +181,7 @@ class AudioSearchWorkflow:
         logger.info(
             f"[{audio_id}] status={status} turns={n_turns}/{self.step_limit} "
             f"submitted={len(predicted_spans)} gold={len(gold_spans)} "
-            f"raw_f1={raw_f1:.3f} reward={reward:.3f}"
+            f"f1={rewards['f1']:.3f} aux={rewards['aux']:.3f} "
+            f"answer={rewards['answer']:.3f} total={rewards['total']:.3f}"
         )
-        return reward
+        return rewards["total"]

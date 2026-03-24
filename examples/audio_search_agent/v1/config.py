@@ -67,7 +67,12 @@ class AudioSearchV1Config(GRPOConfig):
         default="",
         metadata={"help": "Shared tmpdir for Omni audio slices. Empty = system tmp."},
     )
-    iou_threshold: float = field(
-        default=0.5,
-        metadata={"help": "Minimum IoU to count a predicted span as matching a gold span."},
+    # Reward weights
+    aux_weight: float = field(
+        default=0.15,
+        metadata={"help": "Weight for auxiliary reward (submit at step_limit with spans)."},
+    )
+    answer_weight: float = field(
+        default=0.2,
+        metadata={"help": "Weight for answer exact-match reward."},
     )

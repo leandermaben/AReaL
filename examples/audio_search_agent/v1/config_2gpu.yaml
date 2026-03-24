@@ -196,6 +196,7 @@ stats_logger:
     mode: online
     project: audio-search-agent-v1
     id_suffix: timestamp
+    name: null  # set in train.py with timestamp
 
 perf_tracer:
   experiment_name: ${experiment_name}

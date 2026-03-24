@@ -11,6 +11,7 @@ configuration from the YAML.
 from __future__ import annotations
 
 import sys
+import time
 
 from areal import PPOTrainer
 from areal.api.cli_args import load_expr_config
@@ -20,6 +21,11 @@ from .config import AudioSearchV1Config
 
 def main(args):
     config, _ = load_expr_config(args, AudioSearchV1Config)
+
+    # Set wandb run name with timestamp if not already set
+    if not config.stats_logger.wandb.name:
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        config.stats_logger.wandb.name = f"{config.trial_name}_{ts}"
 
     from .dataset import get_meetingbank_dataset
 
@@ -47,7 +53,8 @@ def main(args):
         omni_url=config.omni_url or None,
         omni_model=config.omni_model,
         omni_slice_tmpdir=config.omni_slice_tmpdir or None,
-        iou_threshold=config.iou_threshold,
+        aux_weight=config.aux_weight,
+        answer_weight=config.answer_weight,
     )
 
     with PPOTrainer(config, train_dataset=train_dataset, valid_dataset=valid_dataset) as trainer:

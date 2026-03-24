@@ -24,14 +24,22 @@ class SubmitTool(Tool):
     NAME = "submit"
     DESCRIPTION = (
         "Submit your final answer: a list of audio snippets that are relevant to the "
-        "question. Call this once you have gathered enough evidence. Each snippet must "
-        "have start_time and end_time (in seconds) and a reason explaining why it is "
-        "relevant. Optionally include transcript text and any additional info gathered "
-        "from other tools."
+        "question, along with your predicted answer. Call this once you have gathered "
+        "enough evidence. Each snippet must have start_time and end_time (in seconds) "
+        "and a reason explaining why it is relevant. You must also provide your "
+        "predicted answer. For multiple-choice questions, provide the option letter "
+        "(e.g. 'A', 'B', 'C', or 'D'). For open-ended questions, provide your answer directly."
     )
     PARAMETERS = {
         "type": "object",
         "properties": {
+            "answer": {
+                "type": "string",
+                "description": (
+                    "Your predicted answer to the question "
+                    "(e.g. 'A', 'B', 'C', or 'D' for MCQ)."
+                ),
+            },
             "snippets": {
                 "type": "array",
                 "description": "List of relevant audio snippets to submit.",
@@ -66,7 +74,7 @@ class SubmitTool(Tool):
                 },
             },
         },
-        "required": ["snippets"],
+        "required": ["answer", "snippets"],
     }
 
     def __init__(self, audio_id: str):
@@ -88,17 +96,19 @@ class SubmitTool(Tool):
         return self._submission
 
     def execute(self, **kwargs: Any) -> dict:
-        """Validate and record the submitted snippets.
+        """Validate and record the submitted snippets and answer.
 
         Returns:
-            dict with status, audio_id, num_snippets, and the validated snippets.
+            dict with status, audio_id, answer, num_snippets, and the validated snippets.
         """
+        answer = kwargs.get("answer", "")
         snippets = kwargs.get("snippets", [])
 
         if not snippets:
             return {
                 "status": "error",
                 "audio_id": self._audio_id,
+                "answer": answer,
                 "error": "No snippets provided. Submit at least one snippet.",
                 "num_snippets": 0,
                 "snippets": [],
@@ -142,6 +152,7 @@ class SubmitTool(Tool):
         result = {
             "status": "ok" if validated else "error",
             "audio_id": self._audio_id,
+            "answer": answer,
             "num_snippets": len(validated),
             "snippets": validated,
         }
