@@ -47,6 +47,7 @@ def main(args):
         omni_url=config.omni_url or None,
         omni_model=config.omni_model,
         omni_slice_tmpdir=config.omni_slice_tmpdir or None,
+        iou_threshold=config.iou_threshold,
     )
 
     with PPOTrainer(config, train_dataset=train_dataset, valid_dataset=valid_dataset) as trainer:

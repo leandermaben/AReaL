@@ -41,6 +41,7 @@ class AudioSearchWorkflow:
         omni_url: str | None = None,
         omni_model: str = "Qwen/Qwen3-Omni-30B-A3B-Instruct",
         omni_slice_tmpdir: str | None = None,
+        iou_threshold: float = 0.5,
     ):
         self.max_search_turns = max_search_turns
         self.step_limit = step_limit
@@ -50,6 +51,7 @@ class AudioSearchWorkflow:
         self.omni_url = omni_url
         self.omni_model = omni_model
         self.omni_slice_tmpdir = omni_slice_tmpdir
+        self.iou_threshold = iou_threshold
 
         # Lazy-loaded CLAP indexer (shared across episodes)
         self._clap_indexer = None
@@ -140,13 +142,21 @@ class AudioSearchWorkflow:
         status = result.get("status", "error")
         did_submit = 1.0 if status == "submitted" else 0.0
 
+        # Count total tool calls and estimate sequence length from messages
+        messages = result.get("messages", [])
+        num_tool_calls = sum(
+            len(m.get("tool_calls", [])) for m in messages if m.get("role") == "assistant"
+        )
+        seq_length = sum(len(str(m.get("content", ""))) for m in messages)
+
         # Compute raw F1 (un-gated, for logging) and gated reward
-        raw_f1 = span_f1(predicted_spans, gold_spans)
+        raw_f1 = span_f1(predicted_spans, gold_spans, iou_threshold=self.iou_threshold)
         reward = step_gated_f1_reward(
             predicted_spans=predicted_spans,
             gold_spans=gold_spans,
             n_turns=n_turns,
             step_limit=self.step_limit,
+            iou_threshold=self.iou_threshold,
         )
 
         # Log custom metrics to wandb via stats_tracker
@@ -160,6 +170,8 @@ class AudioSearchWorkflow:
                 did_submit=did_submit,
                 num_predicted_spans=float(len(predicted_spans)),
                 num_gold_spans=float(len(gold_spans)),
+                num_tool_calls=float(num_tool_calls),
+                seq_length=float(seq_length),
             )
         except Exception:
             # stats_tracker may not be available outside AReaL training

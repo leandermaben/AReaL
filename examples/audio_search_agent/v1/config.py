@@ -67,3 +67,7 @@ class AudioSearchV1Config(GRPOConfig):
         default="",
         metadata={"help": "Shared tmpdir for Omni audio slices. Empty = system tmp."},
     )
+    iou_threshold: float = field(
+        default=0.5,
+        metadata={"help": "Minimum IoU to count a predicted span as matching a gold span."},
+    )
