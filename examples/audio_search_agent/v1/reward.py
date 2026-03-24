@@ -68,12 +68,24 @@ def window_f1(
     return {"f1": f1, "precision": precision, "recall": recall}
 
 
+def _is_mcq(gold_answer: str) -> bool:
+    """Return True if the gold answer is a single MCQ option letter (A-D)."""
+    return gold_answer.strip().upper() in {"A", "B", "C", "D"}
+
+
 def answer_reward(predicted_answer: str, gold_answer: str) -> float:
-    """Return 1.0 if predicted answer exactly matches gold answer, else 0.0.
+    """Return answer reward based on question type.
+
+    MCQ (gold answer is a single letter A-D): 1.0 if exact match, else 0.0.
+    Non-MCQ: always 0.5 (neutral) because free-text gold answers are dummies.
 
     Comparison is case-insensitive and stripped of whitespace.
     """
-    if not predicted_answer or not gold_answer:
+    if not gold_answer:
+        return 0.0
+    if not _is_mcq(gold_answer):
+        return 0.5
+    if not predicted_answer:
         return 0.0
     return 1.0 if predicted_answer.strip().lower() == gold_answer.strip().lower() else 0.0
 

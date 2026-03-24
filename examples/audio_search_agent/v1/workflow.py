@@ -13,7 +13,9 @@ The workflow:
 """
 from __future__ import annotations
 
+import json
 import os
+import threading
 from typing import Any
 
 from areal.utils import stats_tracker
@@ -43,6 +45,9 @@ class AudioSearchWorkflow:
         omni_slice_tmpdir: str | None = None,
         aux_weight: float = 0.15,
         answer_weight: float = 0.25,
+        trajectory_log_freq: int = 10,
+        trajectory_log_dir: str | None = None,
+        trial_name: str = "",
     ):
         self.max_search_turns = max_search_turns
         self.step_limit = step_limit
@@ -54,9 +59,52 @@ class AudioSearchWorkflow:
         self.omni_slice_tmpdir = omni_slice_tmpdir
         self.aux_weight = aux_weight
         self.answer_weight = answer_weight
+        self.trajectory_log_freq = trajectory_log_freq
+        self.trajectory_log_dir = trajectory_log_dir
+        self.trial_name = trial_name
 
         # Lazy-loaded CLAP indexer (shared across episodes)
         self._clap_indexer = None
+
+        # Episode counter for trajectory logging (thread-safe)
+        self._episode_counter = 0
+        self._counter_lock = threading.Lock()
+
+    def _next_episode_id(self) -> int:
+        """Return the next episode number (thread-safe)."""
+        with self._counter_lock:
+            self._episode_counter += 1
+            return self._episode_counter
+
+    def _save_trajectory(
+        self, episode_id: int, audio_id: str, question: str,
+        messages: list[dict], rewards: dict, gold_spans: list[dict],
+        gold_answer: str, predicted_spans: list[dict], predicted_answer: str,
+        is_eval: bool,
+    ) -> None:
+        """Save a trajectory to a JSONL file for debugging."""
+        base_dir = self.trajectory_log_dir or os.environ.get(
+            "TRAJECTORY_LOG_DIR", "trajectories"
+        )
+        log_dir = os.path.join(base_dir, self.trial_name) if self.trial_name else base_dir
+        os.makedirs(log_dir, exist_ok=True)
+        prefix = "eval" if is_eval else "train"
+        path = os.path.join(log_dir, f"{prefix}_trajectories.jsonl")
+
+        record = {
+            "episode_id": episode_id,
+            "audio_id": audio_id,
+            "question": question,
+            "messages": messages,
+            "predicted_spans": predicted_spans,
+            "predicted_answer": predicted_answer,
+            "gold_spans": gold_spans,
+            "gold_answer": gold_answer,
+            "rewards": rewards,
+        }
+        with open(path, "a") as f:
+            f.write(json.dumps(record, default=str) + "\n")
+        logger.info(f"[{audio_id}] Saved trajectory (episode {episode_id}) to {path}")
 
     def _get_clap_indexer(self):
         if self._clap_indexer is None:
@@ -198,4 +246,30 @@ class AudioSearchWorkflow:
             f"f1={rewards['f1']:.3f} p={rewards['precision']:.3f} r={rewards['recall']:.3f} "
             f"aux={rewards['aux']:.3f} answer={rewards['answer']:.3f} total={rewards['total']:.3f}"
         )
+
+        # Save trajectory every N episodes
+        episode_id = self._next_episode_id()
+        if self.trajectory_log_freq > 0 and episode_id % self.trajectory_log_freq == 0:
+            try:
+                is_eval = False
+                try:
+                    from areal import workflow_context
+                    is_eval = workflow_context.get().is_eval
+                except Exception:
+                    pass
+                self._save_trajectory(
+                    episode_id=episode_id,
+                    audio_id=audio_id,
+                    question=question,
+                    messages=messages,
+                    rewards=rewards,
+                    gold_spans=gold_spans,
+                    gold_answer=gold_answer,
+                    predicted_spans=predicted_spans,
+                    predicted_answer=predicted_answer,
+                    is_eval=is_eval,
+                )
+            except Exception as exc:
+                logger.warning(f"Failed to save trajectory: {exc}")
+
         return rewards["total"]

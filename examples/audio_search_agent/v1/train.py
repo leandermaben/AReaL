@@ -58,6 +58,9 @@ def main(args):
         omni_slice_tmpdir=config.omni_slice_tmpdir or None,
         aux_weight=config.aux_weight,
         answer_weight=config.answer_weight,
+        trajectory_log_freq=config.trajectory_log_freq,
+        trajectory_log_dir=config.trajectory_log_dir or None,
+        trial_name=config.trial_name,
     )
 
     with PPOTrainer(config, train_dataset=train_dataset, valid_dataset=valid_dataset) as trainer:

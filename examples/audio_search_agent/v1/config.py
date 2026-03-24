@@ -76,3 +76,13 @@ class AudioSearchV1Config(GRPOConfig):
         default=0.25,
         metadata={"help": "Weight for answer exact-match reward."},
     )
+
+    # Trajectory logging
+    trajectory_log_freq: int = field(
+        default=10,
+        metadata={"help": "Save a trajectory every N episodes. 0 = disabled."},
+    )
+    trajectory_log_dir: str = field(
+        default="",
+        metadata={"help": "Directory for trajectory logs. Empty = 'trajectories' in cwd."},
+    )
