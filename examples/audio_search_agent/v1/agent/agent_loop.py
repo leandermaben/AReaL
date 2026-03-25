@@ -292,10 +292,12 @@ class AudioSearchAgent:
 # Helpers
 # ──────────────────────────────────────────────────────────────
 def _message_to_dict(msg: ChatCompletionMessage) -> dict:
-    """Convert an OpenAI ChatCompletionMessage to a serialisable dict."""
-    d: dict[str, Any] = {"role": "assistant"}
-    if msg.content:
-        d["content"] = msg.content
+    """Convert an OpenAI ChatCompletionMessage to a serialisable dict.
+
+    Always includes 'content' key (even when empty/None) to preserve the
+    prefix property needed for KV cache reuse in concat mode.
+    """
+    d: dict[str, Any] = {"role": "assistant", "content": msg.content or ""}
     if msg.tool_calls:
         d["tool_calls"] = [
             {
