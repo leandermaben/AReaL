@@ -109,14 +109,16 @@ def compute_reward(
         return {"total": 0.0, "f1": 0.0, "precision": 0.0, "recall": 0.0, "aux": 0.0, "answer": 0.0}
 
     f1_result = window_f1(predicted_spans, gold_spans)
-    aux = aux_weight if (n_turns == step_limit and predicted_spans) else 0.0
-    ans = answer_weight * answer_reward(predicted_answer, gold_answer)
+    aux_unweighted = 1.0 if (n_turns == step_limit and predicted_spans) else 0.0
+    aux = aux_weight * aux_unweighted
+    ans_unweighted = answer_reward(predicted_answer, gold_answer)
+    ans = answer_weight * ans_unweighted
 
     return {
         "total": f1_result["f1"] + aux + ans,
         "f1": f1_result["f1"],
         "precision": f1_result["precision"],
         "recall": f1_result["recall"],
-        "aux": aux,
-        "answer": ans,
+        "aux": aux_unweighted,
+        "answer": ans_unweighted,
     }

@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import json
 import os
-import threading
+import random
+import time
 from typing import Any
 
 from areal.utils import stats_tracker
@@ -66,18 +67,18 @@ class AudioSearchWorkflow:
         # Lazy-loaded CLAP indexer (shared across episodes)
         self._clap_indexer = None
 
-        # Episode counter for trajectory logging (thread-safe)
-        self._episode_counter = 0
-        self._counter_lock = threading.Lock()
+    def _should_save_trajectory(self) -> bool:
+        """Decide whether to save this episode's trajectory.
 
-    def _next_episode_id(self) -> int:
-        """Return the next episode number (thread-safe)."""
-        with self._counter_lock:
-            self._episode_counter += 1
-            return self._episode_counter
+        Uses probabilistic sampling (1/trajectory_log_freq) so it works
+        without shared state across re-instantiations.
+        """
+        if self.trajectory_log_freq <= 0:
+            return False
+        return random.random() < 1.0 / self.trajectory_log_freq
 
     def _save_trajectory(
-        self, episode_id: int, audio_id: str, question: str,
+        self, audio_id: str, question: str,
         messages: list[dict], rewards: dict, gold_spans: list[dict],
         gold_answer: str, predicted_spans: list[dict], predicted_answer: str,
         is_eval: bool,
@@ -92,7 +93,7 @@ class AudioSearchWorkflow:
         path = os.path.join(log_dir, f"{prefix}_trajectories.jsonl")
 
         record = {
-            "episode_id": episode_id,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "audio_id": audio_id,
             "question": question,
             "messages": messages,
@@ -104,7 +105,7 @@ class AudioSearchWorkflow:
         }
         with open(path, "a") as f:
             f.write(json.dumps(record, default=str) + "\n")
-        logger.info(f"[{audio_id}] Saved trajectory (episode {episode_id}) to {path}")
+        logger.info(f"[{audio_id}] Saved trajectory to {path}")
 
     def _get_clap_indexer(self):
         if self._clap_indexer is None:
@@ -247,9 +248,8 @@ class AudioSearchWorkflow:
             f"aux={rewards['aux']:.3f} answer={rewards['answer']:.3f} total={rewards['total']:.3f}"
         )
 
-        # Save trajectory every N episodes
-        episode_id = self._next_episode_id()
-        if self.trajectory_log_freq > 0 and episode_id % self.trajectory_log_freq == 0:
+        # Probabilistically save trajectory (~1 per trajectory_log_freq episodes)
+        if self._should_save_trajectory():
             try:
                 is_eval = False
                 try:
@@ -258,7 +258,6 @@ class AudioSearchWorkflow:
                 except Exception:
                     pass
                 self._save_trajectory(
-                    episode_id=episode_id,
                     audio_id=audio_id,
                     question=question,
                     messages=messages,

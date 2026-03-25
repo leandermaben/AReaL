@@ -90,6 +90,16 @@ def get_meetingbank_dataset(
             if not question_text or answer is None:
                 continue
 
+            # Include MCQ options in the question text
+            options = q.get("options", {})
+            if options:
+                option_lines = []
+                for letter in sorted(options):
+                    if letter in {"A", "B", "C", "D"}:
+                        option_lines.append(f"{letter}. {options[letter]}")
+                if option_lines:
+                    question_text = question_text + "\n\n" + "\n".join(option_lines)
+
             sample = {
                 "audio_id": audio_id,
                 "messages": [{"role": "user", "content": question_text}],
