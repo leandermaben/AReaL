@@ -26,7 +26,7 @@ from areal.utils.logging import getLogger
 
 logger = getLogger("MeetingBankDataset")
 
-DEFAULT_DATA_ROOT = "/work/hdd/bbjs/lmaben/speech/long_speech/meeting_bank_prepared"
+DEFAULT_DATA_ROOT = "/work/nvme/bffw/lmaben/long_speech/meeting_bank_v2"
 MAX_GOLD_SPAN_DURATION = 1800.0  # 30 minutes
 MAX_NONFACTUAL_RATIO = 0.1  # non-factual questions at most 10% of total
 
@@ -39,14 +39,18 @@ def _total_gold_span_duration(question: dict) -> float:
     )
 
 
+# Tags considered "factual" (LLM-generated, verified)
+FACTUAL_TAGS = {"factual", "single_event", "multi_hop"}
+
+
 def _is_factual_eligible(question: dict) -> bool:
     """Check if a factual question passes the filtering criteria."""
     if _total_gold_span_duration(question) > MAX_GOLD_SPAN_DURATION:
         return False
     v = question.get("verification")
     if v is None:
-        return False
-    return v.get("all_spans_necessary", False)
+        return True  # v2 verified questions already passed filtering
+    return v.get("all_spans_necessary", True)
 
 
 def get_meetingbank_dataset(
@@ -110,7 +114,11 @@ def get_meetingbank_dataset(
                 "duration": duration,
             }
 
-            if tag == "factual":
+            # Skip speaker_count questions
+            if tag == "speaker_count":
+                continue
+
+            if tag in FACTUAL_TAGS:
                 if _is_factual_eligible(q):
                     factual_samples.append(sample)
             else:

@@ -21,7 +21,7 @@ max_search_turns: 8
 step_limit: 8
 
 # Data config
-meetingbank_data_root: /work/hdd/bbjs/lmaben/speech/long_speech/meeting_bank_prepared
+meetingbank_data_root: /work/nvme/bffw/lmaben/long_speech/meeting_bank_v2
 meetingbank_split: train
 max_nonfactual_ratio: 0.1
 val_max_factual: 80
