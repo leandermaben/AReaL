@@ -216,7 +216,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("/work/hdd/bbjs/lmaben/speech/long_speech/meeting_bank_v2"),
+        default=Path("/work/nvme/bffw/lmaben/long_speech/meeting_bank_v2"),
     )
     parser.add_argument("--vllm-url", default="http://localhost:8000/v1")
     parser.add_argument("--model", default="Qwen/Qwen3-4B-Instruct-2507")

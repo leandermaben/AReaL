@@ -329,7 +329,18 @@ async def async_main(args: argparse.Namespace) -> None:
         print("All meetings already have questions.")
         return
 
-    print(f"Generating questions for {len(meeting_ids)} meetings...")
+    # Budget: distribute max_questions across meetings
+    remaining_budget = args.max_questions - len(existing_questions)
+    if remaining_budget <= 0:
+        print(f"Already have {len(existing_questions)} questions (limit: {args.max_questions}).")
+        return
+
+    remaining_meetings = len(meeting_ids)
+    per_meeting_budget = max(5, remaining_budget // max(1, remaining_meetings))
+    print(
+        f"Generating questions for {remaining_meetings} meetings "
+        f"(budget: {remaining_budget} remaining, ~{per_meeting_budget}/meeting)..."
+    )
 
     llm = AsyncLLMClient(
         base_url=args.vllm_url,
@@ -346,47 +357,52 @@ async def async_main(args: argparse.Namespace) -> None:
         if llm.server_down.is_set():
             print("\n[WARN] Server down — stopping early.")
             break
+        if len(all_questions) >= args.max_questions:
+            print(f"\nReached question limit ({args.max_questions}). Stopping.")
+            break
 
         meeting_events = [e for e in events if e["meeting_id"] == meeting_id]
         meeting_edges = [e for e in edges if e["meeting_id"] == meeting_id]
 
+        # Budget per meeting: split ~60% single, ~30% multi-hop, ~10% speaker count
+        n_single = max(1, int(per_meeting_budget * 0.6))
+        n_multi = max(1, int(per_meeting_budget * 0.3))
+
+        # Sample events/edges within budget
+        rng.shuffle(meeting_events)
+        selected_events = meeting_events[:n_single]
+
+        priority_edges = [e for e in meeting_edges if e["edge_type"] != "temporal"]
+        temporal_edges = [e for e in meeting_edges if e["edge_type"] == "temporal"]
+        candidate_edges = priority_edges + temporal_edges[:3]
+        rng.shuffle(candidate_edges)
+        selected_edges = candidate_edges[:n_multi]
+
         tasks = []
 
-        # 1. Single-event questions
-        for ev in meeting_events:
+        # 1. Single-event questions (budgeted)
+        for ev in selected_events:
             qid = f"{meeting_id}:q{q_counter}"
             q_counter += 1
             tasks.append(
-                (
-                    "single",
-                    generate_single_event_question(
-                        llm, ev, segments, speakers_map, qid
-                    ),
+                generate_single_event_question(
+                    llm, ev, segments, speakers_map, qid
                 )
             )
 
-        # 2. Multi-hop questions (from edges, preferring non-temporal edges)
-        # Prioritize structured edges
-        priority_edges = [e for e in meeting_edges if e["edge_type"] != "temporal"]
-        temporal_edges = [e for e in meeting_edges if e["edge_type"] == "temporal"]
-        selected_edges = priority_edges + temporal_edges[:5]
-
+        # 2. Multi-hop questions (budgeted)
         for edge in selected_edges:
             qid = f"{meeting_id}:q{q_counter}"
             q_counter += 1
             tasks.append(
-                (
-                    "multi_hop",
-                    generate_multi_hop_question(
-                        llm, edge, events_map, segments, speakers_map, qid
-                    ),
+                generate_multi_hop_question(
+                    llm, edge, events_map, segments, speakers_map, qid
                 )
             )
 
         # Run LLM tasks concurrently
         if tasks:
-            coros = [t[1] for t in tasks]
-            results = await asyncio.gather(*coros)
+            results = await asyncio.gather(*tasks)
             for result in results:
                 if result is not None:
                     all_questions.append(result)
@@ -421,12 +437,18 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("/work/hdd/bbjs/lmaben/speech/long_speech/meeting_bank_v2"),
+        default=Path("/work/nvme/bffw/lmaben/long_speech/meeting_bank_v2"),
     )
     parser.add_argument("--vllm-url", default="http://localhost:8000/v1")
     parser.add_argument("--model", default="Qwen/Qwen3-4B-Instruct-2507")
     parser.add_argument("--concurrency", type=int, default=64)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--max-questions",
+        type=int,
+        default=10000,
+        help="Stop after generating this many total questions.",
+    )
     args = parser.parse_args()
 
     asyncio.run(async_main(args))

@@ -69,7 +69,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("/work/hdd/bbjs/lmaben/speech/long_speech/meeting_bank_v2"),
+        default=Path("/work/nvme/bffw/lmaben/long_speech/meeting_bank_v2"),
     )
     parser.add_argument("--train-frac", type=float, default=0.8)
     parser.add_argument("--val-frac", type=float, default=0.1)
