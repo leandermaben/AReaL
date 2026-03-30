@@ -30,6 +30,16 @@ def main(args):
     if not config.stats_logger.wandb.name:
         config.stats_logger.wandb.name = config.trial_name
 
+    # Log key config values for verification
+    from areal.utils.logging import getLogger
+    _logger = getLogger("AudioSearchTrain")
+    _logger.info(
+        f"adv_norm: mean_level={config.actor.adv_norm.mean_level}, "
+        f"std_level={config.actor.adv_norm.std_level}, "
+        f"group_size={config.actor.adv_norm.group_size}"
+    )
+    _logger.info(f"n_samples={config.gconfig.n_samples}, kl_ctl={config.actor.kl_ctl}")
+
     from .dataset import get_meetingbank_dataset
 
     # Train: full filtered set (no caps)
