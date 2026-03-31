@@ -112,6 +112,52 @@ uv run python docs/generate_cli_docs.py
 - **Squash**: Squash WIP commits before opening PR
 - **PR requirements**: Run pre-commit, document test coverage, note hardware limitations
 
+## Audio Search Agent — Key Decisions & Status
+
+This section captures hard-won debugging context for `examples/audio_search_agent/`.
+
+### Data Prep v2 (MeetingBank)
+
+- **Pipeline**: 7 scripts in `examples/audio_search_agent/data_prep/meeting_bank/scripts/`
+  (shared.py, 01-07). All phases completed 2026-03-31.
+- **Output**: default dir `/work/nvme/bffw/lmaben/long_speech/meeting_bank_v2/`
+  (override with `--output-dir`). Raw data at
+  `/work/hdd/bbjs/lmaben/speech/long_speech/temp_data/`.
+- **Stats**: 278 meetings, 50K events, 5,442 verified questions (5,164 single_event +
+  278 speaker_count). Speaker count skipped in training.
+- **Multi-hop gap**: 2,769 multi-hop candidates all filtered by `multi_hop_confirmed`
+  check in `06_verify_and_filter.py:129`. To recover, relax that filter and re-run Phase 6.
+- **Qwen3 think tags**: `parse_json_response` in `shared.py` strips `<think>...</think>`
+  blocks — required for Qwen3 models.
+
+### Training Config
+
+- **Advantage norm** (Dr.GRPO): `mean_level: group`, `std_level: null`,
+  `group_size: ${gconfig.n_samples}`. group_size MUST match n_samples or all advantages
+  become 0 (default group_size=1 means each sample's mean = itself).
+- **Concat mode**: `chat_template_type: concat`, `export_style: concat`. Enables KV cache
+  reuse across multi-turn agent conversations. Safe with Qwen3 think tokens.
+  Requires assistant messages to always include `"content"` key (even if empty string).
+- **Tool call parser**: `qwen25` — not `qwen3` (doesn't exist). Same `<tool_call>` XML
+  format used by both Qwen2.5 and Qwen3.
+- **Reward design**:
+  - Window F1 (primary) + auxiliary (submit called at step limit) + answer reward
+  - Non-MCQ answer: always 0.5 (neutral, free-form answers are dummies)
+  - MCQ answer: 0/1 match. `_is_mcq()` checks gold answer in {A,B,C,D}
+- **Trajectory saving**: Probabilistic `random.random() < 1/freq` — stateless, works
+  despite workflow re-instantiation on every `submit()` call
+  (`_resolve_workflow` in `areal/infra/remote_inf_engine.py` creates new instance each time).
+
+### Known Pitfalls
+
+- **Don't use threading/shared state** in workflow code — AReaL has complex async
+  processes and workflows are re-instantiated per call.
+- **CLAP indexer device bug**: `torch.load(map_location="cpu")` + `assign=True` puts
+  model back on CPU. Fixed to use `map_location=self.config.device`.
+- **2-GPU eval proxy**: may OOM on eval-rollout fork. Disable eval on 2-GPU debug configs.
+- **Dataset loader** (`v1/dataset.py`): recognizes tags `factual`, `single_event`,
+  `multi_hop` as factual-eligible. Speaker count questions are skipped.
+
 ## Extended Configuration
 
 See `.claude/agents/`, `.claude/skills/`, `.claude/commands/`, and `.claude/rules/` for
