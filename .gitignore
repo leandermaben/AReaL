@@ -3,6 +3,9 @@
 .data/
 .idea/
 
+# Agent safety game logs
+examples/agent_safety/logs/
+
 # claude
 .claude/settings.local.json
 .claude/sessions/
@@ -204,3 +207,9 @@ wandb/
 outputs/
 sympy/
 !/docs/figures/*
+
+examples/agent_safety/rl/data/*
+examples/agent_safety/llm/hosted_llm_keys.json
+examples/agent_safety/rl_v0/*
+
+**/job_outputs/*

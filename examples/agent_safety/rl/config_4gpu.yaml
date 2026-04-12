@@ -1,0 +1,198 @@
+# Werewolf RL – GRPO training config (4-GPU)
+# Hardware: 1 node, 4× GPU (40GB)
+#   GPU 0-1 → vLLM inference engine (rollout, tp=2)
+#   GPU 2-3 → FSDP actor + ref model (training, 2 GPUs)
+#
+# Launch:
+#   python -m examples.agent_safety.rl.train \
+#       --config examples/agent_safety/rl/config_4gpu.yaml
+
+experiment_name: werewolf-rl-gspo
+trial_name: 4gpu
+
+seed: 42
+enable_offload: false
+total_train_epochs: 2
+total_train_steps: null
+tokenizer_path: ${actor.path}
+
+# Werewolf environment config
+econfig:
+  max_game_days: 6
+  timeout: 600.0
+
+# Trajectory logging
+trajectory_log_freq: 50
+trajectory_log_dir: ""
+
+cluster:
+  n_nodes: 1
+  n_gpus_per_node: 4
+  fileroot: /work/nvme/bbjs/lmaben/areal/werewolf_rl
+  name_resolve:
+    type: nfs
+    nfs_record_root: /tmp/areal/name_resolve
+
+# 2 GPUs for vLLM (tp=2) + 2 GPUs for actor+ref
+allocation_mode: vllm:d2p1t1+d2p1t1
+
+scheduler:
+  type: local
+
+rollout:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  tokenizer_path: ${tokenizer_path}
+  max_concurrent_rollouts: 32
+  queue_size: null
+  consumer_batch_size: ${train_dataset.batch_size}
+  max_head_offpolicyness: 2
+  enable_rollout_tracing: false
+  scheduling_spec: ${actor.scheduling_spec}
+  dump_to_file: true
+  openai:
+    mode: inline
+    tool_call_parser: qwen25
+    reasoning_parser: qwen3
+    chat_template_type: concat
+    export_style: concat
+    turn_discount: 0.9
+
+gconfig:
+  n_samples: 8
+  min_new_tokens: 0
+  max_new_tokens: 512
+  max_tokens: 16384
+  greedy: false
+  temperature: 1.0
+
+actor:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: Qwen/Qwen3-4B-Instruct-2507
+  init_from_scratch: false
+  disable_dropout: true
+  gradient_checkpointing: true
+  dtype: bfloat16
+  mb_spec:
+    max_tokens_per_mb: 16384
+  optimizer:
+    type: adam
+    lr: 5.0e-6
+    weight_decay: 0.01
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1e-8
+    lr_scheduler_type: constant
+    gradient_clipping: 1.0
+    warmup_steps_proportion: 0.01
+  importance_sampling_level: sequence  # GSPO
+  eps_clip: 0.4
+  temperature: ${gconfig.temperature}
+  reward_scaling: 1.0
+  reward_bias: 0.0
+  kl_ctl: 0.0
+  ppo_n_minibatches: 1
+  recompute_logprob: true
+  use_decoupled_loss: true
+  behave_imp_weight_cap: 5.0
+  reward_norm: null
+  adv_norm:
+    mean_level: group
+    std_level: null
+    group_size: ${gconfig.n_samples}
+  max_new_tokens: ${gconfig.max_new_tokens}
+  scheduling_spec:
+    - task_type: worker
+      port_count: 2
+      gpu: 1
+      mem: 32
+      cmd: python3 -m areal.infra.rpc.rpc_server
+      env_vars:
+        CUDA_LAUNCH_BLOCKING: "1"
+        PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True"
+
+ref:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: ${actor.path}
+  init_from_scratch: false
+  disable_dropout: true
+  dtype: ${actor.dtype}
+  mb_spec:
+    max_tokens_per_mb: 16384
+  optimizer: null
+  scheduling_strategy:
+    type: colocation
+    target: actor
+  scheduling_spec: ${actor.scheduling_spec}
+
+# vLLM inference engine (tp=2 across 2 GPUs)
+vllm:
+  model: ${actor.path}
+  seed: ${seed}
+  skip_tokenizer_init: false
+  dtype: ${actor.dtype}
+  max_model_len: 16384
+  gpu_memory_utilization: 0.85
+
+# Dataset (JSONL paths)
+train_dataset:
+  batch_size: 8
+  shuffle: true
+  pin_memory: true
+  num_workers: 2
+  path: examples/agent_safety/rl/data/werewolf_train.jsonl
+  type: rl
+
+valid_dataset:
+  batch_size: 8
+  pin_memory: true
+  num_workers: 2
+  path: examples/agent_safety/rl/data/werewolf_valid.jsonl
+  type: rl
+
+# Checkpointing
+saver:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: 100
+  freq_secs: null
+
+recover:
+  mode: disabled
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: null
+  freq_secs: 3600
+
+evaluator:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: 1
+  freq_steps: 20
+  freq_secs: null
+
+stats_logger:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  wandb:
+    mode: online
+    project: werewolf-rl
+    id_suffix: timestamp
+    name: null
+
+perf_tracer:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  enabled: false
+  session_tracer:
+    enabled: false
