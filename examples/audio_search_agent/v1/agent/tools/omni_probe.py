@@ -13,12 +13,12 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import re
 import tempfile
 from pathlib import Path
 from typing import Any
 
-import torchaudio
 from openai import AsyncOpenAI
 
 from areal.utils.logging import getLogger
@@ -65,22 +65,30 @@ def _slice_audio_to_file(
     """Slice a wav file and save the segment to a temp file.
 
     Returns the path to the temp file. The caller is responsible for cleanup.
+    Uses soundfile directly to avoid torchaudio backend issues.
     """
-    waveform, sr = torchaudio.load(wav_path)  # (C, T)
+    import soundfile as sf
 
-    start_sample = max(0, min(int(start_time * sr), waveform.shape[1]))
-    end_sample = max(start_sample, min(int(end_time * sr), waveform.shape[1]))
-    segment = waveform[:, start_sample:end_sample]
+    info = sf.info(wav_path)
+    sr = info.samplerate
 
-    if segment.shape[1] == 0:
+    start_sample = max(0, min(int(start_time * sr), info.frames))
+    end_sample = max(start_sample, min(int(end_time * sr), info.frames))
+    n_frames = end_sample - start_sample
+
+    if n_frames == 0:
         raise ValueError(
             f"Empty audio segment: start_time={start_time}, end_time={end_time}, "
-            f"audio length={waveform.shape[1] / sr:.1f}s"
+            f"audio length={info.frames / sr:.1f}s"
         )
+
+    with sf.SoundFile(wav_path) as f:
+        f.seek(start_sample)
+        segment = f.read(n_frames)  # (N, C) or (N,)
 
     fd, tmp_path = tempfile.mkstemp(suffix=".wav", dir=tmpdir)
     os.close(fd)
-    torchaudio.save(tmp_path, segment, sr, format="wav")
+    sf.write(tmp_path, segment, sr)
     return tmp_path
 
 
@@ -135,7 +143,7 @@ class OmniProbeTool(Tool):
         wav_path: str,
         audio_id: str,
         api_key: str = "dummy",
-        max_retries: int = 2,
+        max_retries: int = 4,
         temperature: float = 0.2,
         slice_tmpdir: str | None = _SLICE_TMPDIR,
     ):
@@ -282,6 +290,7 @@ class OmniProbeTool(Tool):
                     messages=messages,
                     max_tokens=1024,
                     temperature=self._temperature,
+                    modalities=["text"]
                 )
                 raw = resp.choices[0].message.content or ""
                 parsed = _parse_json_response(raw)
@@ -320,7 +329,9 @@ class OmniProbeTool(Tool):
                     f"Omni probe API error (attempt {attempt+1}/{self._max_retries+1}): {exc}"
                 )
                 if attempt < self._max_retries:
-                    await asyncio.sleep(1 + attempt)
+                    # Exponential backoff with jitter: 2^attempt seconds ± 0.5s, capped at 30s
+                    delay = min(30.0, 2 ** attempt) + random.uniform(-0.5, 0.5)
+                    await asyncio.sleep(max(0.1, delay))
                 else:
                     return self._error(
                         start_time, end_time, question, f"API call failed: {exc}"
@@ -332,6 +343,7 @@ class OmniProbeTool(Tool):
         self, start_time: float, end_time: float, question: str, error: str
     ) -> dict:
         """Build a standardised error response."""
+        logger.warning(f"Omni probe error: {error}")
         return {
             "status": "error",
             "audio_id": self._audio_id,

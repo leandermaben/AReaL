@@ -8,12 +8,14 @@ from .base import Tool
 from .clap_search import CLAPSearchTool
 from .omni_probe import OmniProbeTool
 from .submit import SubmitTool
+from .transcript_search import TranscriptSearchTool
 
 # Plain dict — no magic. Add new tools here as they're implemented.
 TOOL_REGISTRY: dict[str, type[Tool]] = {
     "clap_search": CLAPSearchTool,
     "omni_probe": OmniProbeTool,
     "submit": SubmitTool,
+    "transcript_search": TranscriptSearchTool,
 }
 
 

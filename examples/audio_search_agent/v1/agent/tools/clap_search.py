@@ -10,7 +10,7 @@ Example tool call from the LLM:
         "name": "clap_search",
         "arguments": {
             "query": "applause after a vote",
-            "top_k": 5
+            "top_k": 30
         }
     }
 """

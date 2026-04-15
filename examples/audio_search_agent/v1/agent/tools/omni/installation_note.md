@@ -5,18 +5,50 @@ uv pip install -r requirements/cuda.txt
 
 # Pre-built does not work
 
+# Had to 
+
+"""
+uv python install 3.12
+
+
+uv python find cpython-3.12.13
+
+
+uv venv /work/nvme/bbjs/lmaben/envs/long_speech/omni_dtai \
+    --python /u/lmaben/.local/share/uv/python/cpython-3.12.13-linux-aarch64-gnu/bin/python3.12 \
+    --seed
+"""
+
+cd ~/AReaL/examples/audio_search_agent/v1/agent/tools/omni/installation_repos/vllm
+rm -rf build dist *.egg-info
+find . -name "*.so" -delete
+
+# Clean rebuild
+unset CPATH
+export CUDA_HOME=/sw/spack/vtest/apps/cuda/12.6.0-gcc-13.2.1.cray-nhummo6
+export PATH=$CUDA_HOME/bin:$PATH
+export CC=/usr/bin/gcc-12
+export CXX=/usr/bin/g++-12
+export CUDAHOSTCXX=$CXX
+export TORCH_CUDA_ARCH_LIST="9.0"
+export MAX_JOBS=32
+
+pip install -e . -v --no-build-isolation 2>&1 | tail -20
+
+
+
 unset VLLM_USE_PRECOMPILED
 unset VLLM_PRECOMPILED_WHEEL_LOCATION
-export MAX_JOBS=24
+export MAX_JOBS=36
 export NVCC_THREADS=1
-export TORCH_CUDA_ARCH_LIST="8.0;8.6" #Targeting only A100 and A40 and leaving out H100 (makes it faster)
+export TORCH_CUDA_ARCH_LIST="9.0" #Targeting only A100 and A40 and leaving out H100 (makes it faster)
 
 uv pip install -e . -v --no-build-isolation
 
 pip install git+https://github.com/huggingface/transformers
-pip install accelerate
-pip install qwen-omni-utils -U
-pip install -U flash-attn --no-build-isolation
+uv pip install accelerate
+uv pip install qwen-omni-utils -U
+uv pip install -U flash-attn --no-build-isolation
 
 Issues with the vllm branch:
 
